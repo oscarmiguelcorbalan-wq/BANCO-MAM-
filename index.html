@@ -180,7 +180,8 @@ async function recargar(silencioso){
     render();
   }catch(e){
     console.error(e); badge.textContent="Sin conexión";
-    showMsg("err","No pude leer los datos de la hoja ("+esc(e.message)+"). Revisá la conexión y tocá «Actualizar».");
+    document.querySelectorAll("#msgs .msg.err").forEach(m=>m.remove());
+    showMsg("err","No pude conectar con la hoja de Google ("+esc(e.message)+"). Si tenés internet, el problema está en el Apps Script: abrí su enlace /exec para ver el error, y recordá implementar siempre una «Nueva versión» después de cambiar el código.");
     render();
   }
 }
