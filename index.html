@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Movimientos bancarios de Mary</title>
+<meta name="robots" content="noindex">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f4f3ef; --surface:#fcfcfb; --surface-2:#f0efea; --line:#e2e0d9;
+  --text:#0b0b0b; --text-2:#52514e; --muted:#7a7873;
+  --in:#2a78d6; --out:#eb6834; --accent:#1c5cab;
+  --warn-bg:#fff4dc; --warn-tx:#7a4d00; --ok-bg:#e3f4ea; --ok-tx:#0f5a32; --err-bg:#fde7e6; --err-tx:#8a1f1d;
+}
+@media (prefers-color-scheme:dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme:dark;
+    --bg:#121211; --surface:#1a1a19; --surface-2:#232321; --line:#33322f;
+    --text:#f0efec; --text-2:#c3c2b7; --muted:#8f8d86;
+    --in:#3987e5; --out:#d95926; --accent:#86b6ef;
+    --warn-bg:#3a2c0b; --warn-tx:#f3cf85; --ok-bg:#12321f; --ok-tx:#9ee0b8; --err-bg:#3d1716; --err-tx:#f3a9a7;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
+header{background:var(--surface);border-bottom:1px solid var(--line);padding:14px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header h1{font-size:18px;margin:0;flex:1;min-width:200px}
+header h1 small{display:block;font-weight:400;font-size:12.5px;color:var(--muted)}
+.btn{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:8px;padding:8px 13px;font:inherit;font-size:14px;cursor:pointer}
+.btn:hover{background:var(--surface-2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+:root:where(:not([data-theme="light"])) .btn.pri{color:#0b0b0b}
+@media (prefers-color-scheme:light){.btn.pri{color:#fff}}
+.btn.sm{padding:4px 9px;font-size:13px}
+.btn.danger{color:var(--err-tx)}
+.badge{font-size:12px;padding:3px 8px;border-radius:99px;background:var(--surface-2);color:var(--text-2);white-space:nowrap}
+nav{display:flex;gap:4px;padding:10px 18px 0;overflow-x:auto;background:var(--surface);border-bottom:1px solid var(--line)}
+nav button{appearance:none;border:0;background:none;font:inherit;font-size:14px;padding:9px 12px;color:var(--text-2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+nav button.on{color:var(--text);border-bottom-color:var(--accent);font-weight:600}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 18px}
+.bar label{font-size:13px;color:var(--text-2)}
+select,input[type=search],input[type=text]{font:inherit;font-size:14px;padding:6px 9px;border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--text)}
+main{padding:0 18px 40px;max-width:1200px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.card h2{font-size:15px;margin:0 0 4px}
+.card .sub{font-size:13px;color:var(--muted);margin:0 0 12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+.kpi .l{font-size:12.5px;color:var(--text-2)}
+.kpi .v{font-size:22px;font-weight:650;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .n{font-size:12px;color:var(--muted)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:820px){.grid2{grid-template-columns:1fr}}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{text-align:left;font-weight:600;color:var(--text-2);font-size:12.5px;border-bottom:1px solid var(--line);padding:7px 8px;white-space:nowrap}
+td{border-bottom:1px solid var(--line);padding:7px 8px;vertical-align:top}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.click{cursor:pointer}
+tr.click:hover td{background:var(--surface-2)}
+.deb{color:var(--text)}
+.cr{color:var(--ok-tx);font-weight:550}
+.small{font-size:12px;color:var(--muted)}
+.tag{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:99px;background:var(--surface-2);color:var(--text-2);margin-right:4px;white-space:nowrap}
+.tag.auto{background:var(--warn-bg);color:var(--warn-tx)}
+.msg{border-radius:10px;padding:11px 14px;margin:12px 18px 0;font-size:14px}
+.msg.ok{background:var(--ok-bg);color:var(--ok-tx)}
+.msg.warn{background:var(--warn-bg);color:var(--warn-tx)}
+.msg.err{background:var(--err-bg);color:var(--err-tx)}
+.msg ul{margin:6px 0 0;padding-left:18px}
+.msg .x{float:right;cursor:pointer;border:0;background:none;color:inherit;font-size:16px}
+.empty{text-align:center;padding:50px 20px}
+.empty h2{font-size:18px}
+.drop{border:2px dashed var(--line);border-radius:14px;padding:30px;text-align:center;color:var(--text-2);margin-top:14px}
+#overlay{position:fixed;inset:0;background:rgba(28,92,171,.15);border:4px dashed var(--accent);display:none;align-items:center;justify-content:center;font-size:22px;font-weight:600;z-index:50;color:var(--text)}
+#overlay.on{display:flex}
+#tip{position:fixed;pointer-events:none;background:var(--surface);border:1px solid var(--line);box-shadow:0 4px 14px rgba(0,0,0,.15);border-radius:8px;padding:8px 10px;font-size:13px;display:none;z-index:60;min-width:150px}
+#tip b{display:block;margin-bottom:3px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:4px 11px;font-size:13px;cursor:pointer;color:var(--text-2)}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.legend{display:flex;gap:16px;font-size:13px;color:var(--text-2);margin-bottom:6px}
+.hbar{display:grid;grid-template-columns:minmax(90px,150px) 1fr auto;gap:8px;align-items:center;font-size:13px;margin:5px 0}
+.hbar .track{height:14px}
+.hbar .fill{height:14px;border-radius:0 4px 4px 0;background:var(--out)}
+.hbar .val{font-variant-numeric:tabular-nums;color:var(--text)}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:70;padding:20px}
+.modal{background:var(--surface);border-radius:12px;padding:20px;max-width:420px;width:100%;border:1px solid var(--line)}
+.modal h3{margin:0 0 8px;font-size:16px}
+.modal .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.dupg{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.dupg .h{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.status{font-size:12px;color:var(--muted)}
+svg text{fill:var(--text-2);font-size:11px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Movimientos bancarios de Mary<small id="cuentaInfo">Cargá el resumen que descargás del banco</small></h1>
+  <span class="badge" id="stBadge">Conectando…</span>
+  <button class="btn" id="btnRef" title="Volver a leer los datos de la hoja">↻ Actualizar</button>
+  <button class="btn" id="btnSalir" title="Cambiar de clave">Salir</button>
+  <label class="btn pri" for="file" id="btnFile" hidden>＋ Añadir resumen del banco</label>
+  <input type="file" id="file" accept=".xlsx,.xls,.csv" multiple hidden>
+</header>
+<nav id="tabs"></nav>
+<div id="msgs"></div>
+<div class="bar" id="filtros"></div>
+<main id="view"></main>
+<div id="overlay">Soltá aquí el Excel del banco</div>
+<div id="tip"></div>
+<div id="modalRoot"></div>
+
+<script>
+"use strict";
+/* ---------- utilidades ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtARS = new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",minimumFractionDigits:2});
+const money = v => fmtARS.format(v||0);
+const money0 = v => new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(v||0);
+const compact = v => { const a=Math.abs(v); if(a>=1e6) return "$"+(v/1e6).toFixed(1).replace(".",",")+" M"; if(a>=1e3) return "$"+Math.round(v/1e3)+" mil"; return "$"+Math.round(v); };
+const norm = s => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim();
+const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const mesLabel = ym => { const [y,m]=ym.split("-"); return MESES[+m-1].replace(/^./,c=>c.toUpperCase())+" "+y; };
+const mesCorto = ym => { const [y,m]=ym.split("-"); return MESES[+m-1].slice(0,3)+" "+y.slice(2); };
+const fFecha = iso => { const [y,m,d]=iso.split("-"); return d+"/"+m+"/"+y; };
+const addDays = (iso,n) => { const d=new Date(iso+"T12:00:00"); d.setDate(d.getDate()+Math.round(n)); return d.toISOString().slice(0,10); };
+const diffDays = (a,b) => Math.round((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/864e5);
+const median = arr => { if(!arr.length) return 0; const s=[...arr].sort((a,b)=>a-b), k=s.length>>1; return s.length%2?s[k]:(s[k-1]+s[k])/2; };
+const titleCase = s => s.toLowerCase().replace(/(^|[\s\/])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase());
+
+/* ---------- estado ---------- */
+const CATS_DEF = ["Cuidadoras","Familia","Servicios","Seguros","Compras","Ingresos ANSES","Alquileres","Préstamos","Intereses","Otros","Sin clasificar"];
+let S = { rows:[], config:{alias:{},cat:{},okDup:{},cuenta:""}, imports:[] };
+let UI = { tab:"resumen", periodo:"todo", q:"", tipoF:"todos", cpF:"", trF:"todas" };
+
+/* ---------- datos: Google Sheets a través del Apps Script ---------- */
+/* Dirección de la implementación del Apps Script (termina en /exec). */
+const API_URL = "https://script.google.com/macros/s/AKfycbw_P-pzltSzq8Mz6LgVa7iDe1uYPc9465Lltwy4MV_x4BB6j1blqKYc37H_oALdYs5d/exec";
+const LS_KEY = "bancoMamClave";
+let ROL = null;            // "admin" | "lectura"
+const esAdmin = () => ROL === "admin";
+function getClave(){ try{ return localStorage.getItem(LS_KEY)||""; }catch(e){ return ""; } }
+function setClave(k){ try{ k?localStorage.setItem(LS_KEY,k):localStorage.removeItem(LS_KEY); }catch(e){} }
+async function apiGet(k){
+  const r = await fetch(API_URL+"?k="+encodeURIComponent(k)+"&t="+Date.now(), {redirect:"follow"});
+  if(!r.ok) throw new Error("el servidor respondió "+r.status);
+  return r.json();
+}
+async function apiPost(accion, datos){
+  const r = await fetch(API_URL, {method:"POST", redirect:"follow", headers:{"Content-Type":"text/plain;charset=utf-8"}, body: JSON.stringify(Object.assign({k:getClave(), accion}, datos||{}))});
+  if(!r.ok) throw new Error("el servidor respondió "+r.status);
+  const j = await r.json();
+  if(!j.ok) throw new Error(j.error==="solo_lectura" ? "esta clave solo permite ver" : j.error==="clave" ? "clave incorrecta" : j.error);
+  return j;
+}
+let wq = Promise.resolve();
+function persist(fn){ wq = wq.then(fn).catch(e=>{ console.error(e); showMsg("err","No se pudo guardar en la hoja: "+esc(e.message||e)+". Tocá «Actualizar» y volvé a intentarlo."); }); return wq; }
+function aplicarDatos(d){
+  S.rows = d.rows||[];
+  S.imports = d.imports||[];
+  S.config = {alias:{}, cat:{}, okDup:d.okDup||{}, cuenta:d.cuenta||""};
+  for(const [k,v] of Object.entries(d.contrapartes||{})){ if(v.nombre) S.config.alias[k]=v.nombre; if(v.cat) S.config.cat[k]=v.cat; }
+  rebuild();
+}
+async function recargar(silencioso){
+  const badge=$("#stBadge");
+  badge.textContent="Cargando…";
+  try{
+    const d = await apiGet(getClave());
+    if(!d.ok){ setClave(""); ROL=null; pantallaClave(d.error==="clave"?"Clave incorrecta.":"No se pudo entrar."); return; }
+    ROL = d.rol; aplicarDatos(d);
+    badge.textContent = esAdmin() ? "Administrador" : "Solo lectura";
+    badge.title = esAdmin() ? "Podés cargar resúmenes y cambiar nombres y categorías." : "Podés ver todo, pero no cambiar nada.";
+    $("#btnFile").hidden = !esAdmin();
+    render();
+  }catch(e){
+    console.error(e); badge.textContent="Sin conexión";
+    showMsg("err","No pude leer los datos de la hoja ("+esc(e.message)+"). Revisá la conexión y tocá «Actualizar».");
+    render();
+  }
+}
+const stripRow = r => ({id:r.id,f:r.f,d:r.d,deb:r.deb,cred:r.cred,saldo:r.saldo,imp:r.imp,ord:r.ord});
+
+/* ---------- lectura del Excel del banco ---------- */
+function parseMonto(v){
+  if(v===null||v===undefined||v==="") return 0;
+  if(typeof v==="number") return Math.round(v*100)/100;
+  let s = String(v).replace(/[^\d,.\-]/g,"");
+  if(!s) return 0;
+  if(s.includes(",")) s = s.replace(/\./g,"").replace(",",".");
+  else if((s.match(/\./g)||[]).length>1) s = s.replace(/\./g,"");
+  const n = parseFloat(s); return isNaN(n)?0:Math.round(n*100)/100;
+}
+function parseFecha(v){
+  const p2 = n => String(n).padStart(2,"0");
+  if(v instanceof Date && !isNaN(v)) return v.getFullYear()+"-"+p2(v.getMonth()+1)+"-"+p2(v.getDate());
+  if(typeof v==="number" && v>20000 && v<80000){ const o=XLSX.SSF.parse_date_code(v); return o.y+"-"+p2(o.m)+"-"+p2(o.d); }
+  const m = String(v||"").match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  if(m){ let y=+m[3]; if(y<100) y+=2000; return y+"-"+p2(m[2])+"-"+p2(m[1]); }
+  return null;
+}
+const keyOf = r => [r.f, r.d.replace(/\s+/g," ").trim().toUpperCase(), r.deb.toFixed(2), r.cred.toFixed(2), r.saldo.toFixed(2)].join("|");
+
+function parseFile(buf, name){
+  const wb = XLSX.read(buf,{type:"array",cellDates:true});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const A = XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
+  let cuenta="", saldosAl="", h=-1;
+  for(let i=0;i<A.length;i++){
+    const c0 = norm(A[i][0]);
+    if(c0.startsWith("cuenta")) cuenta = String(A[i][1]||"").trim();
+    if(c0.startsWith("saldos al")) saldosAl = String(A[i][1]||"").trim();
+    if(c0==="fecha" && A[i].some(c=>norm(c).startsWith("descrip"))){ h=i; break; }
+  }
+  if(h<0) throw new Error("no encuentro la fila de títulos (Fecha, Descripción, Débito, Crédito, Saldo). ¿Es el Excel de movimientos del banco?");
+  const H = A[h].map(norm), col = p => H.findIndex(x=>x.startsWith(p));
+  const iF=col("fecha"), iD=col("descrip"), iDb=col("debito"), iCr=col("credito"), iS=col("saldo");
+  if([iF,iD,iDb,iCr].some(i=>i<0)) throw new Error("faltan columnas: necesito Fecha, Descripción, Débito y Crédito.");
+  const rows=[];
+  for(let i=h+1;i<A.length;i++){
+    const R=A[i], f=parseFecha(R[iF]); if(!f) continue;
+    const d=String(R[iD]||"").trim(); const deb=parseMonto(R[iDb]), cred=parseMonto(R[iCr]);
+    if(!d && !deb && !cred) continue;
+    rows.push({f,d,deb,cred,saldo:iS>=0?parseMonto(R[iS]):0,ord:rows.length});
+  }
+  if(!rows.length) throw new Error("el archivo no tiene movimientos.");
+  return {name,cuenta,saldosAl,rows};
+}
+
+/* ---------- análisis de cada línea ---------- */
+function analiza(desc){
+  const d = String(desc||"");
+  let m;
+  if((m = d.match(/^TRANSFERENCIA\s+(D\/C|ENTRE CUENTAS)\s+VAR\s+(\d{8,11})\s*(.*)$/i))){
+    const parts = m[3].trim().split(/\s{2,}/);
+    return {tipo:"Transferencia", sub: /D\/C/i.test(m[1])?"a otro banco":"entre cuentas", id:m[2], nombre:(parts[0]||"").trim(), nota:parts.slice(1).join(" ").trim()};
+  }
+  if((m = d.match(/^COMPRAS\s+PATAGONIA\s+24\s+(.*)$/i))){
+    let n = m[1].replace(/^MERPAGO\*/i,"").replace(/^WWW\./i,"").trim();
+    return {tipo:"Compra con tarjeta", sub:/MERPAGO/i.test(m[1])?"Mercado Pago":"", id:null, nombre:n, nota:""};
+  }
+  if((m = d.match(/^DEBITO\s+AUTOMATICO\s+DE\s+(.*)$/i))) return {tipo:"Débito automático", sub:"", id:null, nombre:m[1].replace(/\.$/,"").trim(), nota:""};
+  if(/ANSES/i.test(d)) return {tipo:"ANSES", sub:"", id:null, nombre:"ANSES", nota:d.replace(/ANSES/i,"").trim()};
+  if(/INTERES/i.test(d)) return {tipo:"Intereses", sub:"", id:null, nombre:"Intereses del banco", nota:""};
+  return {tipo:"Otro", sub:"", id:null, nombre:d.trim(), nota:""};
+}
+const cpKeyOf = a => a.id ? "id:"+a.id : "n:"+norm(a.nombre).replace(/[^a-z0-9]+/g," ").trim();
+
+/* reglas iniciales: se pueden cambiar en la pestaña Contrapartes */
+const REGLAS = [
+  [/EDETSA|EDET/i, "EDET (luz)", "Servicios"],
+  [/NATURGY/i, "Naturgy (gas)", "Servicios"],
+  [/TELECOM/i, "Telecom (teléfono/internet)", "Servicios"],
+  [/SURA/i, "Seguros Sura", "Seguros"],
+  [/^ANSES$/i, "ANSES", "Ingresos ANSES"],
+  [/Intereses del banco/i, "Intereses del banco", "Intereses"],
+];
+let CP = {}; // key -> {names:Map, tipo, id}
+function rebuild(){
+  CP = {};
+  for(const r of S.rows){
+    r.a = analiza(r.d); r.cp = cpKeyOf(r.a); r.ym = r.f.slice(0,7); r.k = keyOf(r);
+    const c = CP[r.cp] ||= {names:new Map(), tipos:new Set(), id:r.a.id};
+    c.names.set(r.a.nombre, (c.names.get(r.a.nombre)||0)+1); c.tipos.add(r.a.tipo);
+  }
+  S.rows.sort((x,y)=> x.f<y.f?1:x.f>y.f?-1 : (x.imp===y.imp ? x.ord-y.ord : (x.imp<y.imp?1:-1)));
+}
+function regla(key){
+  const c = CP[key]; if(!c) return null;
+  const all = [...c.names.keys()].join(" | ");
+  for(const [re,alias,cat] of REGLAS) if(re.test(all)) return {alias,cat};
+  return null;
+}
+function cpName(key){
+  if(S.config.alias[key]) return S.config.alias[key];
+  const rg = regla(key); if(rg) return rg.alias;
+  const c = CP[key]; if(!c) return key;
+  const best = [...c.names.entries()].sort((a,b)=>b[1]-a[1]||b[0].length-a[0].length)[0];
+  return best && best[0] ? titleCase(best[0]) : (c.id ? "CUIT/CUIL "+c.id : "(sin nombre)");
+}
+function cpCat(key){
+  if(S.config.cat[key]) return S.config.cat[key];
+  const rg = regla(key); if(rg) return rg.cat;
+  const c = CP[key];
+  if(c && c.tipos.has("Compra con tarjeta")) return "Compras";
+  if(c && c.tipos.has("Débito automático")) return "Servicios";
+  return "Sin clasificar";
+}
+function allCats(){ const s=new Set(CATS_DEF); Object.values(S.config.cat).forEach(c=>s.add(c)); return [...s]; }
+
+/* ---------- importar y quitar duplicados ---------- */
+async function importar(files){
+  if(!esAdmin()){ showMsg("warn","Solo el administrador puede cargar resúmenes."); return; }
+  const badge=$("#stBadge");
+  for(const file of files){
+    try{
+      badge.textContent="Leyendo "+file.name+"…";
+      const res = parseFile(await file.arrayBuffer(), file.name);
+      badge.textContent="Guardando en la hoja…";
+      const r = await apiPost("importar", {archivo:file.name, cuenta:res.cuenta, saldosAl:res.saldosAl, rows:res.rows});
+      if(r.rechazado){ showMsg("err",`<b>${esc(file.name)}</b>: es de otra cuenta (${esc(res.cuenta)}), no de la de Mary (${esc(r.cuentaGuardada)}). No lo cargué.`); continue; }
+      let txt = `<b>${esc(file.name)}</b> (${fFecha(r.desde)} a ${fFecha(r.hasta)}): ${res.rows.length} líneas → <b>${r.nuevas} ${r.nuevas===1?"nueva":"nuevas"}</b>${r.dup?`, ${r.dup} ya ${r.dup===1?"estaba cargada y la descarté":"estaban cargadas y las descarté"}`:""}.`;
+      let tipo="ok";
+      if(r.antesMax && r.desde > r.antesMax){ txt += `<br>Atención: este resumen empieza el ${fFecha(r.desde)} y lo último que había era del ${fFecha(r.antesMax)}. Si hubo movimientos entre medio, faltan: conviene descargar un resumen que cubra esos días.`; tipo="warn"; }
+      else if(r.antesMin && r.hasta < r.antesMin){ txt += `<br>Atención: este resumen termina el ${fFecha(r.hasta)} y lo cargado empezaba el ${fFecha(r.antesMin)}. Podría faltar algo entre medio.`; tipo="warn"; }
+      showMsg(tipo, txt);
+    }catch(e){
+      console.error(e);
+      showMsg("err",`<b>${esc(file.name)}</b>: no lo pude cargar: ${esc(e.message)}`);
+    }
+  }
+  await recargar();
+}
+async function borrarFila(id){
+  try{ await apiPost("borrar",{id}); showMsg("ok","Línea eliminada."); }catch(e){ showMsg("err","No se pudo eliminar: "+esc(e.message)); }
+  await recargar();
+}
+async function borrarTodo(){
+  try{ await apiPost("borrarTodo",{}); showMsg("ok","Se borraron todos los movimientos. Los nombres y categorías se conservan."); }catch(e){ showMsg("err","No se pudo borrar: "+esc(e.message)); }
+  await recargar();
+}
+
+/* posibles duplicados: mismo día, mismo importe, misma contraparte, distinto saldo */
+function posiblesDup(){
+  const g={};
+  for(const r of S.rows){ const k=[r.f,r.cp,r.deb.toFixed(2),r.cred.toFixed(2)].join("|"); (g[k] ||= []).push(r); }
+  return Object.entries(g).filter(([k,v])=>v.length>1).map(([k,v])=>({k,rows:v,ok:!!S.config.okDup[k]}));
+}
+
+/* ---------- filtros de período ---------- */
+function meses(){ return [...new Set(S.rows.map(r=>r.ym))].sort(); }
+function enPeriodo(rows){
+  const p=UI.periodo; if(p==="todo") return rows;
+  if(p==="u3"){ const ms=meses().slice(-3); return rows.filter(r=>ms.includes(r.ym)); }
+  return rows.filter(r=>r.ym===p);
+}
+function periodoTxt(){ const p=UI.periodo; return p==="todo"?"todo lo cargado":p==="u3"?"los últimos 3 meses":mesLabel(p); }
+
+/* ---------- recurrentes ---------- */
+function recurrentes(dir){
+  const M = meses().length || 1;
+  const g={};
+  for(const r of S.rows){ const v = dir==="sal"?r.deb:r.cred; if(v>0) (g[r.cp] ||= []).push({...r, v}); }
+  const out=[];
+  for(const [cp,list] of Object.entries(g)){
+    const ms = new Set(list.map(r=>r.ym));
+    const auto = list.some(r=>r.a.tipo==="Débito automático");
+    const n = list.length;
+    if(!(auto || (ms.size>=2 && n>=2) || (M===1 && n>=3))) continue;
+    const fechas = [...new Set(list.map(r=>r.f))].sort();
+    const gaps = fechas.slice(1).map((f,i)=>diffDays(fechas[i],f));
+    const med = median(gaps);
+    let freq;
+    if(!gaps.length) freq = auto ? "Mensual (débito automático)" : "—";
+    else if(med<=9) freq="Varias veces al mes";
+    else if(med<=19) freq="Quincenal";
+    else if(med<=40) freq="Mensual";
+    else freq="Irregular";
+    const vals = list.map(r=>r.v), total = vals.reduce((a,b)=>a+b,0), prom = total/n;
+    const sd = Math.sqrt(vals.reduce((a,b)=>a+(b-prom)**2,0)/n), cv = prom? sd/prom : 0;
+    const ultima = fechas[fechas.length-1];
+    let proxima = null;
+    if(freq.startsWith("Mensual")) proxima = addDays(ultima, gaps.length? med : 30);
+    else if(freq==="Quincenal") proxima = addDays(ultima, med);
+    out.push({cp, n, meses:ms.size, M, freq, total, prom, min:Math.min(...vals), max:Math.max(...vals), fijo: cv<0.08, porMes: total/M, ultima, proxima, auto});
+  }
+  return out.sort((a,b)=>b.porMes-a.porMes);
+}
+
+/* ---------- interfaz ---------- */
+const TABS = [["resumen","Resumen"],["movs","Movimientos"],["recur","Gastos recurrentes"],["transf","Transferencias"],["dups","Duplicados y cargas"],["cps","Contrapartes"]];
+function showMsg(tipo, html){
+  const d=document.createElement("div"); d.className="msg "+tipo; d.innerHTML=`<button class="x" aria-label="Cerrar">×</button>`+html;
+  d.querySelector(".x").onclick=()=>d.remove(); $("#msgs").prepend(d);
+}
+function render(){
+  $("#tabs").innerHTML = TABS.map(([k,l])=>`<button data-t="${k}" class="${UI.tab===k?"on":""}">${l}</button>`).join("");
+  const imp = S.imports.slice().sort((a,b)=>a.hasta<b.hasta?1:a.hasta>b.hasta?-1:(a.id<b.id?1:-1))[0];
+  $("#cuentaInfo").textContent = S.rows.length
+    ? `${S.config.cuenta?("Cuenta "+S.config.cuenta+" · "):""}${S.rows.length} movimientos del ${fFecha(S.rows[S.rows.length-1].f)} al ${fFecha(S.rows[0].f)}`
+    : "Cargá el resumen que descargás del banco";
+  const ms = meses();
+  const usaPeriodo = ["resumen","movs","transf"].includes(UI.tab);
+  if(UI.periodo!=="todo" && UI.periodo!=="u3" && !ms.includes(UI.periodo)) UI.periodo="todo";
+  $("#filtros").innerHTML = (S.rows.length && usaPeriodo) ? `<label for="per">Período</label>
+    <select id="per"><option value="todo">Todo lo cargado</option>${ms.length>3?`<option value="u3">Últimos 3 meses</option>`:""}${ms.slice().reverse().map(m=>`<option value="${m}">${mesLabel(m)}</option>`).join("")}</select>` : "";
+  if($("#per")){ $("#per").value=UI.periodo; $("#per").onchange=e=>{UI.periodo=e.target.value; render();}; }
+  const v = $("#view");
+  if(!S.rows.length && UI.tab!=="dups"){ v.innerHTML = vistaVacia(); return; }
+  v.innerHTML = ({resumen:vResumen, movs:vMovs, recur:vRecur, transf:vTransf, dups:vDups, cps:vCps})[UI.tab]();
+  after[UI.tab] && after[UI.tab]();
+}
+function vistaVacia(){
+  if(!esAdmin()) return `<div class="card empty"><h2>Todavía no hay movimientos cargados</h2><p class="small">Cuando Oscar cargue el resumen del banco, aparecerán aquí. Tocá «Actualizar» para ver lo último.</p></div>`;
+  return `<div class="card empty"><h2>Todavía no hay movimientos cargados</h2>
+  <p class="small">En la web del banco, entrá a la cuenta de Mary → Últimos movimientos → Compartir/Descargar, y cargá aquí el Excel (<i>CompartirDetalleMovimiento-….xlsx</i>).<br>Podés cargar varios a la vez y repetir cuando quieras: las líneas que ya estaban se descartan solas.<br><br>Los movimientos se guardan en la hoja de Google y la familia los ve al instante con su clave.</p>
+  <div class="drop">Arrastrá el archivo aquí o <label class="btn pri" for="file">elegilo</label></div></div>`;
+}
+
+/* --- Resumen --- */
+function vResumen(){
+  const R = enPeriodo(S.rows);
+  const ent = R.reduce((a,r)=>a+r.cred,0), sal = R.reduce((a,r)=>a+r.deb,0);
+  const imp = S.imports.slice().sort((a,b)=>a.hasta<b.hasta?1:a.hasta>b.hasta?-1:(a.id<b.id?1:-1))[0];
+  const saldo = imp ? imp.saldoFinal : S.rows[0].saldo;
+  // por categoría (salidas)
+  const porCat={}; for(const r of R) if(r.deb) porCat[cpCat(r.cp)]=(porCat[cpCat(r.cp)]||0)+r.deb;
+  const cats = Object.entries(porCat).sort((a,b)=>b[1]-a[1]);
+  const maxC = cats.length?cats[0][1]:1;
+  // entradas por origen
+  const porOri={}; for(const r of R) if(r.cred) porOri[r.cp]=(porOri[r.cp]||0)+r.cred;
+  const oris = Object.entries(porOri).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  return `
+  <div class="kpis">
+    <div class="kpi"><div class="l">Saldo de la cuenta</div><div class="v">${money(saldo)}</div><div class="n">${imp&&imp.saldosAl?"según el banco al "+esc(imp.saldosAl):"último saldo cargado"}</div></div>
+    <div class="kpi"><div class="l"><span class="dot" style="background:var(--in)"></span>Entró</div><div class="v">${money0(ent)}</div><div class="n">${periodoTxt()}</div></div>
+    <div class="kpi"><div class="l"><span class="dot" style="background:var(--out)"></span>Salió</div><div class="v">${money0(sal)}</div><div class="n">${periodoTxt()}</div></div>
+    <div class="kpi"><div class="l">Diferencia</div><div class="v">${(ent-sal>=0?"+":"−")+money0(Math.abs(ent-sal))}</div><div class="n">entradas menos salidas</div></div>
+  </div>
+  <div class="card"><h2>Entradas y salidas por mes</h2><p class="sub">Todos los meses cargados. Pasá el dedo o el ratón por un mes para ver el detalle.</p>
+    <div class="legend"><span><span class="dot" style="background:var(--in)"></span>Entradas</span><span><span class="dot" style="background:var(--out)"></span>Salidas</span></div>
+    <div id="chartMes"></div></div>
+  <div class="grid2">
+    <div class="card"><h2>¿En qué se fue el dinero?</h2><p class="sub">Salidas por categoría · ${periodoTxt()}. Las categorías se cambian en «Contrapartes».</p>
+      ${cats.map(([c,v])=>`<div class="hbar"><span>${esc(c)}</span><div class="track"><div class="fill" style="width:${Math.max(1,v/maxC*100)}%"></div></div><span class="val">${compact(v)}</span></div>`).join("")||'<p class="small">Sin salidas en este período.</p>'}
+    </div>
+    <div class="card"><h2>¿De dónde entró?</h2><p class="sub">Entradas por origen · ${periodoTxt()}</p>
+      <div class="tw"><table><tr><th>Origen</th><th class="num">Veces</th><th class="num">Total</th></tr>
+      ${oris.map(([cp,v])=>`<tr class="click" data-cp="${esc(cp)}"><td>${esc(cpName(cp))}<div class="small">${esc(cpCat(cp))}</div></td><td class="num">${R.filter(r=>r.cp===cp&&r.cred).length}</td><td class="num">${money0(v)}</td></tr>`).join("")}
+      </table></div></div>
+  </div>`;
+}
+function chartMes(){
+  const el=$("#chartMes"); if(!el) return;
+  const ms=meses(); const data=ms.map(m=>{const R=S.rows.filter(r=>r.ym===m); return {m, e:R.reduce((a,r)=>a+r.cred,0), s:R.reduce((a,r)=>a+r.deb,0), n:R.length};});
+  const W=Math.max(320, Math.min(1100, el.clientWidth||700)), Hh=240, pl=56, pr=8, pt=10, pb=28;
+  const max = Math.max(1,...data.map(d=>Math.max(d.e,d.s)));
+  const step = niceStep(max/4), top = Math.ceil(max/step)*step;
+  const y = v => pt + (Hh-pt-pb)*(1-v/top);
+  const gw = (W-pl-pr)/data.length, bw = Math.min(34,(gw-14)/2);
+  let s=`<svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="Entradas y salidas por mes">`;
+  for(let v=0; v<=top+1; v+=step){ s+=`<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${pl-6}" y="${y(v)+4}" text-anchor="end">${compact(v)}</text>`; }
+  data.forEach((d,i)=>{
+    const cx = pl + gw*i + gw/2;
+    const bar=(x,v,c)=>{ const yy=y(v), h=y(0)-yy; if(h<=0) return ""; const r=Math.min(4,h,bw/2); return `<path d="M${x},${y(0)} V${yy+r} Q${x},${yy} ${x+r},${yy} H${x+bw-r} Q${x+bw},${yy} ${x+bw},${yy+r} V${y(0)} Z" fill="${c}"/>`; };
+    s+=bar(cx-bw-1,d.e,"var(--in)")+bar(cx+1,d.s,"var(--out)");
+    s+=`<text x="${cx}" y="${Hh-8}" text-anchor="middle">${mesCorto(d.m)}</text>`;
+    s+=`<rect x="${pl+gw*i}" y="${pt}" width="${gw}" height="${Hh-pt-pb}" fill="transparent" data-i="${i}" class="hit"/>`;
+  });
+  s+=`</svg>`; el.innerHTML=s;
+  const tip=$("#tip");
+  el.querySelectorAll(".hit").forEach(h=>{
+    const show=ev=>{ const d=data[+h.dataset.i]; const p=ev.touches?ev.touches[0]:ev;
+      tip.innerHTML=`<b>${mesLabel(d.m)}</b><span class="dot" style="background:var(--in)"></span>Entradas ${money0(d.e)}<br><span class="dot" style="background:var(--out)"></span>Salidas ${money0(d.s)}<br><span class="small">${d.n} movimientos</span>`;
+      tip.style.display="block"; const x=Math.min(p.clientX+14, window.innerWidth-200); tip.style.left=x+"px"; tip.style.top=(p.clientY+14)+"px"; h.setAttribute("fill","rgba(127,127,127,.08)"); };
+    h.addEventListener("mousemove",show); h.addEventListener("touchstart",show,{passive:true});
+    h.addEventListener("mouseleave",()=>{tip.style.display="none"; h.setAttribute("fill","transparent");});
+    h.addEventListener("click",()=>{ UI.periodo=data[+h.dataset.i].m; UI.tab="movs"; tip.style.display="none"; render(); });
+  });
+}
+function niceStep(x){ const p=10**Math.floor(Math.log10(x||1)), f=x/p; return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p; }
+
+/* --- Movimientos --- */
+function filtrarMovs(){
+  let R = enPeriodo(S.rows);
+  const t=UI.tipoF;
+  if(t==="ent") R=R.filter(r=>r.cred>0);
+  else if(t==="sal") R=R.filter(r=>r.deb>0);
+  else if(t==="transf") R=R.filter(r=>r.a.tipo==="Transferencia");
+  else if(t==="comp") R=R.filter(r=>r.a.tipo==="Compra con tarjeta");
+  else if(t==="auto") R=R.filter(r=>r.a.tipo==="Débito automático");
+  else if(t==="anses") R=R.filter(r=>r.a.tipo==="ANSES");
+  if(UI.cpF) R=R.filter(r=>r.cp===UI.cpF);
+  const q=norm(UI.q); if(q) R=R.filter(r=>norm(r.d+" "+cpName(r.cp)+" "+cpCat(r.cp)+" "+fFecha(r.f)).includes(q));
+  return R;
+}
+function vMovs(){
+  const R=filtrarMovs(), ent=R.reduce((a,r)=>a+r.cred,0), sal=R.reduce((a,r)=>a+r.deb,0);
+  const dupIds = new Set(posiblesDup().filter(g=>!g.ok).flatMap(g=>g.rows.map(r=>r.id)));
+  return `<div class="card">
+   <div class="bar" style="padding:0 0 12px">
+     <input type="search" id="q" placeholder="Buscar (nombre, comercio, fecha…)" value="${esc(UI.q)}" style="flex:1;min-width:180px">
+     <select id="tipoF">${[["todos","Todos"],["ent","Solo entradas"],["sal","Solo salidas"],["transf","Transferencias"],["comp","Compras con tarjeta"],["auto","Débitos automáticos"],["anses","ANSES"]].map(([k,l])=>`<option value="${k}" ${UI.tipoF===k?"selected":""}>${l}</option>`).join("")}</select>
+     ${UI.cpF?`<span class="chip on" id="cpX">${esc(cpName(UI.cpF))} ✕</span>`:""}
+   </div>
+   <p class="sub">${R.length} movimientos · entró ${money0(ent)} · salió ${money0(sal)} · ${periodoTxt()}</p>
+   <div class="tw"><table>
+    <tr><th>Fecha</th><th>Quién / qué</th><th>Categoría</th><th class="num">Salida</th><th class="num">Entrada</th><th class="num">Saldo</th></tr>
+    ${R.map(r=>`<tr><td class="num" style="text-align:left">${fFecha(r.f)}</td>
+      <td><span class="click-cp" data-cp="${esc(r.cp)}" style="cursor:pointer;font-weight:550">${esc(cpName(r.cp))}</span>${dupIds.has(r.id)?' <span class="tag auto" title="Mismo día, importe y contraparte que otra línea">¿duplicado?</span>':""}
+        <div class="small"><span class="tag">${esc(r.a.tipo)}${r.a.sub?" · "+esc(r.a.sub):""}</span>${r.a.nota?"«"+esc(r.a.nota)+"» ":""}${esc(r.d)}</div></td>
+      <td><span class="tag">${esc(cpCat(r.cp))}</span></td>
+      <td class="num deb">${r.deb?money(r.deb):""}</td><td class="num cr">${r.cred?money(r.cred):""}</td><td class="num small">${money(r.saldo)}</td></tr>`).join("")}
+   </table></div></div>`;
+}
+
+/* --- Recurrentes --- */
+function tablaRecur(list, dir){
+  if(!list.length) return `<p class="small">No hay suficientes datos todavía. Con más meses cargados aparecen solos.</p>`;
+  return `<div class="tw"><table><tr><th>${dir==="sal"?"A quién / qué":"De quién"}</th><th>Frecuencia</th><th class="num">Veces</th><th class="num">Meses</th><th class="num">Importe habitual</th><th class="num">Promedio por mes</th><th class="num">Última</th><th class="num">Próxima (estimada)</th></tr>
+  ${list.map(x=>`<tr class="click" data-cp="${esc(x.cp)}"><td><b>${esc(cpName(x.cp))}</b><div class="small">${esc(cpCat(x.cp))}${x.auto?' · <span class="tag auto">débito automático</span>':""}</div></td>
+    <td>${x.freq}</td><td class="num">${x.n}</td><td class="num">${x.meses} de ${x.M}</td>
+    <td class="num">${x.fijo?money0(x.prom)+`<div class="small">${x.min===x.max?"siempre igual":"importe estable"}</div>`:money0(x.min)+" – "+money0(x.max)+'<div class="small">media '+money0(x.prom)+'</div>'}</td>
+    <td class="num"><b>${money0(x.porMes)}</b></td><td class="num">${fFecha(x.ultima)}</td><td class="num">${x.proxima?fFecha(x.proxima):"—"}</td></tr>`).join("")}
+  </table></div>`;
+}
+function vRecur(){
+  const sal=recurrentes("sal"), ent=recurrentes("ent"), M=meses().length;
+  const tot = sal.reduce((a,x)=>a+x.porMes,0);
+  return `<div class="card"><h2>Gastos que se repiten</h2>
+   <p class="sub">Salidas que aparecen en 2 o más meses distintos, o que son débitos automáticos. Analizado sobre los ${M} ${M===1?"mes":"meses"} cargados (no depende del período). En total suman unos <b>${money0(tot)} por mes</b>. Tocá una fila para ver sus movimientos.</p>
+   ${tablaRecur(sal,"sal")}</div>
+   <div class="card"><h2>Ingresos que se repiten</h2><p class="sub">Entradas habituales: ANSES, aportes de la familia, alquileres…</p>${tablaRecur(ent,"ent")}</div>`;
+}
+
+/* --- Transferencias --- */
+function vTransf(){
+  const T = enPeriodo(S.rows).filter(r=>r.a.tipo==="Transferencia");
+  const g={}; for(const r of T){ const x=g[r.cp] ||= {env:0,rec:0,nE:0,nR:0,ult:r.f}; if(r.deb){x.env+=r.deb;x.nE++;} if(r.cred){x.rec+=r.cred;x.nR++;} if(r.f>x.ult) x.ult=r.f; }
+  let L = Object.entries(g);
+  if(UI.trF==="env") L=L.filter(([k,x])=>x.nE); if(UI.trF==="rec") L=L.filter(([k,x])=>x.nR);
+  L.sort((a,b)=> UI.trF==="rec" ? b[1].rec-a[1].rec : (b[1].env+b[1].rec)-(a[1].env+a[1].rec));
+  const tE=T.reduce((a,r)=>a+r.deb,0), tR=T.reduce((a,r)=>a+r.cred,0);
+  const det = T.filter(r=> UI.trF==="env"?r.deb : UI.trF==="rec"?r.cred : true);
+  return `<div class="kpis">
+    <div class="kpi"><div class="l">Transferencias enviadas</div><div class="v">${money0(tE)}</div><div class="n">${T.filter(r=>r.deb).length} envíos · ${periodoTxt()}</div></div>
+    <div class="kpi"><div class="l">Transferencias recibidas</div><div class="v">${money0(tR)}</div><div class="n">${T.filter(r=>r.cred).length} recibidas · ${periodoTxt()}</div></div>
+  </div>
+  <div class="card"><div class="chips" style="margin-bottom:12px">${[["todas","Todas"],["env","Enviadas"],["rec","Recibidas"]].map(([k,l])=>`<span class="chip ${UI.trF===k?"on":""}" data-tr="${k}">${l}</span>`).join("")}</div>
+   <h2>Por persona</h2><p class="sub">Tocá una persona para ver todos sus movimientos.</p>
+   <div class="tw"><table><tr><th>Persona / CUIT</th><th>Categoría</th><th class="num">Enviado</th><th class="num">Recibido</th><th class="num">Neto para Mary</th><th class="num">Último</th></tr>
+   ${L.map(([cp,x])=>`<tr class="click" data-cp="${esc(cp)}"><td><b>${esc(cpName(cp))}</b><div class="small">${CP[cp]&&CP[cp].id?"CUIT/CUIL "+esc(CP[cp].id):""}</div></td><td><span class="tag">${esc(cpCat(cp))}</span></td>
+     <td class="num">${x.env?money0(x.env)+`<div class="small">${x.nE} ${x.nE===1?"vez":"veces"}</div>`:""}</td>
+     <td class="num cr">${x.rec?money0(x.rec)+`<div class="small">${x.nR} ${x.nR===1?"vez":"veces"}</div>`:""}</td>
+     <td class="num">${(x.rec-x.env>=0?"+":"−")+money0(Math.abs(x.rec-x.env))}</td><td class="num">${fFecha(x.ult)}</td></tr>`).join("")}
+   </table></div></div>
+  <div class="card"><h2>Detalle</h2><div class="tw"><table><tr><th>Fecha</th><th>Persona</th><th>Tipo</th><th>Nota</th><th class="num">Enviada</th><th class="num">Recibida</th></tr>
+   ${det.map(r=>`<tr><td>${fFecha(r.f)}</td><td>${esc(cpName(r.cp))}</td><td class="small">${esc(r.a.sub)}</td><td class="small">${esc(r.a.nota)}</td><td class="num">${r.deb?money(r.deb):""}</td><td class="num cr">${r.cred?money(r.cred):""}</td></tr>`).join("")}
+  </table></div></div>`;
+}
+
+/* --- Duplicados y cargas --- */
+function vDups(){
+  const G = posiblesDup(), pend=G.filter(g=>!g.ok), rev=G.filter(g=>g.ok);
+  const imps = S.imports.slice().reverse();
+  return `<div class="card"><h2>Cómo se evitan los duplicados</h2>
+   <p class="sub" style="margin:0">Cada vez que se carga un resumen, la app compara cada línea (fecha, descripción, importes y saldo) con lo que ya había. Si ya estaba, la descarta. Así podés cargar resúmenes que se solapan, o el mismo dos veces, sin que se dupliquen. Si en un mismo día hubo dos movimientos idénticos de verdad, se respetan los dos porque el saldo después de cada uno es distinto.</p></div>
+  <div class="card"><h2>Para revisar: posibles duplicados ${pend.length?`<span class="badge">${pend.length}</span>`:""}</h2>
+   <p class="sub">Mismo día, mismo importe y misma persona o comercio, pero con distinto saldo: lo más probable es que sean dos movimientos reales, pero conviene mirarlo. Si alguno sobra, eliminalo.</p>
+   ${pend.length? pend.map(gr).join("") : '<p class="small">Nada pendiente. 👍</p>'}
+   ${rev.length?`<details><summary class="small">Ya revisados (${rev.length})</summary>${rev.map(gr).join("")}</details>`:""}
+  </div>
+  <div class="card"><h2>Resúmenes cargados</h2>
+   ${imps.length?`<div class="tw"><table><tr><th>Cargado</th><th>Archivo</th><th>Período</th><th class="num">Líneas</th><th class="num">Nuevas</th><th class="num">Duplicadas descartadas</th></tr>
+   ${imps.map(i=>`<tr><td class="small">${new Date(i.id).toLocaleString("es-AR")}</td><td class="small">${esc(i.archivo)}</td><td>${fFecha(i.desde)} – ${fFecha(i.hasta)}</td><td class="num">${i.filas}</td><td class="num">${i.nuevas}</td><td class="num">${i.dup}</td></tr>`).join("")}</table></div>`:'<p class="small">Todavía no cargaste ninguno.</p>'}
+   ${S.rows.length&&esAdmin()?`<p style="margin-top:14px"><button class="btn sm danger" id="wipe">Borrar todos los movimientos…</button></p>`:""}
+  </div>`;
+}
+function gr(g){
+  const r0=g.rows[0];
+  return `<div class="dupg"><div class="h"><span><b>${fFecha(r0.f)}</b> · ${esc(cpName(r0.cp))} · ${money(r0.deb||r0.cred)} ${r0.deb?"(salida)":"(entrada)"} · ${g.rows.length} veces</span>
+   ${!esAdmin()?"":g.ok?`<button class="btn sm" data-unok="${esc(g.k)}">Volver a revisar</button>`:`<button class="btn sm" data-ok="${esc(g.k)}">Están bien, son ${g.rows.length} movimientos reales</button>`}</div>
+   <table>${g.rows.map(r=>`<tr><td class="small">${esc(r.d)}</td><td class="num small">saldo ${money(r.saldo)}</td><td class="num">${esAdmin()?`<button class="btn sm danger" data-del="${esc(r.id)}">Eliminar esta línea</button>`:""}</td></tr>`).join("")}</table></div>`;
+}
+
+/* --- Contrapartes --- */
+function vCps(){
+  const L = Object.keys(CP).map(k=>{ const R=S.rows.filter(r=>r.cp===k); return {k, ent:R.reduce((a,r)=>a+r.cred,0), sal:R.reduce((a,r)=>a+r.deb,0), n:R.length}; })
+    .sort((a,b)=>(cpCat(a.k)==="Sin clasificar"?0:1)-(cpCat(b.k)==="Sin clasificar"?0:1) || (b.ent+b.sal)-(a.ent+a.sal));
+  const cats = allCats();
+  const sc = L.filter(x=>cpCat(x.k)==="Sin clasificar").length;
+  return `<div class="card"><h2>Personas, comercios y organismos</h2>
+   <p class="sub">${esAdmin()?"":"Solo el administrador puede cambiar nombres y categorías. "}Poné un nombre fácil y una categoría a cada uno; se aplica a todos sus movimientos, también a los que cargues más adelante. ${sc?`<b>${sc} sin clasificar</b> (arriba de todo).`:""}</p>
+   <div class="tw"><table><tr><th>Nombre en la app</th><th>Como aparece en el banco</th><th>Categoría</th><th class="num">Salidas</th><th class="num">Entradas</th></tr>
+   ${L.map(x=>{ const c=CP[x.k]; return `<tr><td>${esAdmin()?`<input type="text" data-alias="${esc(x.k)}" value="${esc(cpName(x.k))}" style="width:100%;min-width:150px">`:`<b>${esc(cpName(x.k))}</b>`}</td>
+     <td class="small">${esc([...c.names.keys()].join(" · "))}${c.id?"<br>CUIT/CUIL "+esc(c.id):""}</td>
+     <td>${esAdmin()?`<select data-cat="${esc(x.k)}">${cats.map(ct=>`<option ${ct===cpCat(x.k)?"selected":""}>${esc(ct)}</option>`).join("")}<option value="__new">+ Nueva categoría…</option></select>`:`<span class="tag">${esc(cpCat(x.k))}</span>`}</td>
+     <td class="num">${x.sal?money0(x.sal):""}</td><td class="num cr">${x.ent?money0(x.ent):""}</td></tr>`; }).join("")}
+   </table></div></div>`;
+}
+
+/* --- eventos por vista --- */
+function irACp(cp){ UI.cpF=cp; UI.tab="movs"; UI.tipoF="todos"; UI.q=""; render(); window.scrollTo(0,0); }
+const after = {
+  resumen(){ chartMes(); document.querySelectorAll("tr[data-cp]").forEach(t=>t.onclick=()=>irACp(t.dataset.cp)); },
+  movs(){
+    const q=$("#q"); let tm; q.oninput=()=>{ clearTimeout(tm); tm=setTimeout(()=>{ UI.q=q.value; const pos=q.selectionStart; render(); const n=$("#q"); n.focus(); n.setSelectionRange(pos,pos); },250); };
+    $("#tipoF").onchange=e=>{UI.tipoF=e.target.value; render();};
+    if($("#cpX")) $("#cpX").onclick=()=>{UI.cpF=""; render();};
+    document.querySelectorAll(".click-cp").forEach(s=>s.onclick=()=>irACp(s.dataset.cp));
+  },
+  recur(){ document.querySelectorAll("tr[data-cp]").forEach(t=>t.onclick=()=>{ UI.periodo="todo"; irACp(t.dataset.cp); }); },
+  transf(){
+    document.querySelectorAll("[data-tr]").forEach(c=>c.onclick=()=>{UI.trF=c.dataset.tr; render();});
+    document.querySelectorAll("tr[data-cp]").forEach(t=>t.onclick=()=>irACp(t.dataset.cp));
+  },
+  dups(){
+    document.querySelectorAll("[data-ok]").forEach(b=>b.onclick=()=>{ S.config.okDup[b.dataset.ok]=true; persist(()=>apiPost("okDup",{gk:b.dataset.ok,valor:true})); render(); });
+    document.querySelectorAll("[data-unok]").forEach(b=>b.onclick=()=>{ delete S.config.okDup[b.dataset.unok]; persist(()=>apiPost("okDup",{gk:b.dataset.unok,valor:false})); render(); });
+    document.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>confirmar("¿Eliminar esta línea?","Se quita de la app (no del banco). Si te equivocás, volvé a cargar el resumen y reaparece.","Eliminar",()=>borrarFila(b.dataset.del)));
+    if($("#wipe")) $("#wipe").onclick=()=>confirmar("¿Borrar todos los movimientos?","Se borran todos los movimientos cargados. Los nombres y categorías se conservan. Después podés volver a cargar los resúmenes.","Borrar todo",borrarTodo);
+  },
+  cps(){
+    document.querySelectorAll("[data-alias]").forEach(i=>i.onchange=()=>{ const k=i.dataset.alias, v=i.value.trim(); if(v) S.config.alias[k]=v; else delete S.config.alias[k]; guardarCp(k); render(); });
+    document.querySelectorAll("[data-cat]").forEach(s=>s.onchange=()=>{
+      const k=s.dataset.cat;
+      if(s.value==="__new"){ pedirTexto("Nueva categoría","Nombre de la categoría (ej. Médicos, Farmacia, Alquiler peluquería):", v=>{ S.config.cat[k]=v; guardarCp(k); render(); }, ()=>render()); return; }
+      S.config.cat[k]=s.value; guardarCp(k); render();
+    });
+  }
+};
+
+function guardarCp(k){ persist(()=>apiPost("contraparte",{clave:k, nombre:S.config.alias[k]||cpName(k), cat:S.config.cat[k]||cpCat(k)})); }
+
+/* --- diálogos propios (los del navegador están bloqueados aquí) --- */
+function confirmar(titulo, texto, boton, ok){
+  const r=$("#modalRoot"); r.innerHTML=`<div class="modal-bg"><div class="modal"><h3>${esc(titulo)}</h3><p class="small">${esc(texto)}</p><div class="acts"><button class="btn" id="mNo">Cancelar</button><button class="btn pri" id="mSi">${esc(boton)}</button></div></div></div>`;
+  $("#mNo").onclick=()=>r.innerHTML=""; $("#mSi").onclick=()=>{ r.innerHTML=""; ok(); };
+}
+function pedirTexto(titulo, texto, ok, cancel){
+  const r=$("#modalRoot"); r.innerHTML=`<div class="modal-bg"><div class="modal"><h3>${esc(titulo)}</h3><p class="small">${esc(texto)}</p><input type="text" id="mTx" style="width:100%"><div class="acts"><button class="btn" id="mNo">Cancelar</button><button class="btn pri" id="mSi">Guardar</button></div></div></div>`;
+  const i=$("#mTx"); i.focus();
+  const go=()=>{ const v=i.value.trim(); r.innerHTML=""; v?ok(v):cancel(); };
+  $("#mNo").onclick=()=>{ r.innerHTML=""; cancel(); }; $("#mSi").onclick=go; i.onkeydown=e=>{ if(e.key==="Enter") go(); };
+}
+
+
+/* --- arranque --- */
+$("#tabs").addEventListener("click",e=>{ const b=e.target.closest("button[data-t]"); if(b){ UI.tab=b.dataset.t; render(); } });
+$("#file").addEventListener("change",e=>{ const f=[...e.target.files]; e.target.value=""; if(f.length) importar(f); });
+let dragN=0;
+window.addEventListener("dragenter",e=>{ if(esAdmin() && [...(e.dataTransfer?.types||[])].includes("Files")){ dragN++; $("#overlay").classList.add("on"); } });
+window.addEventListener("dragleave",()=>{ dragN=Math.max(0,dragN-1); if(!dragN) $("#overlay").classList.remove("on"); });
+window.addEventListener("dragover",e=>e.preventDefault());
+window.addEventListener("drop",e=>{ e.preventDefault(); dragN=0; $("#overlay").classList.remove("on"); const f=[...(e.dataTransfer?.files||[])]; if(f.length) importar(f); });
+let rt; window.addEventListener("resize",()=>{ clearTimeout(rt); rt=setTimeout(()=>{ if(UI.tab==="resumen") chartMes(); },200); });
+
+function pantallaClave(error){
+  $("#tabs").innerHTML=""; $("#filtros").innerHTML=""; $("#btnFile").hidden=true; $("#stBadge").textContent="Sin entrar";
+  $("#view").innerHTML = `<div class="card empty" style="max-width:420px;margin:30px auto">
+    <h2>Entrar</h2><p class="small">Escribí la clave que te pasó Oscar.</p>
+    <form id="fClave"><input type="password" id="clave" autocomplete="current-password" style="width:100%;margin:6px 0 10px" placeholder="Clave">
+    <button class="btn pri" style="width:100%">Entrar</button></form>
+    ${error?`<p class="small" style="color:var(--err-tx)">${esc(error)}</p>`:""}</div>`;
+  $("#fClave").onsubmit = e => { e.preventDefault(); const k=$("#clave").value.trim(); if(!k) return; setClave(k); recargar(); };
+  $("#clave").focus();
+}
+$("#btnRef").onclick = () => { if(getClave()) recargar(); };
+$("#btnSalir").onclick = () => { setClave(""); ROL=null; S.rows=[]; rebuild(); $("#msgs").innerHTML=""; pantallaClave(); };
+(function start(){
+  if(typeof XLSX==="undefined") showMsg("err","No se pudo cargar el lector de Excel. Revisá la conexión y recargá la página.");
+  if(API_URL.startsWith("PEGAR")){ $("#view").innerHTML='<div class="card empty"><h2>Falta conectar la hoja</h2><p class="small">Falta pegar en <code>index.html</code> la dirección del Apps Script (API_URL).</p></div>'; $("#stBadge").textContent="Sin configurar"; return; }
+  if(getClave()) recargar(); else pantallaClave();
+})();
+</script>
+</body>
+</html>
