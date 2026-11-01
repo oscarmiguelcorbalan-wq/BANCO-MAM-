@@ -164,6 +164,7 @@ function aplicarDatos(d){
   S.rows = d.rows||[];
   S.imports = d.imports||[];
   S.config = {alias:{}, cat:{}, okDup:d.okDup||{}, cuenta:d.cuenta||""};
+  S.categorias = d.categorias||[];
   for(const [k,v] of Object.entries(d.contrapartes||{})){ if(v.nombre) S.config.alias[k]=v.nombre; if(v.cat) S.config.cat[k]=v.cat; }
   rebuild();
 }
@@ -254,9 +255,10 @@ const cpKeyOf = a => a.id ? "id:"+a.id : "n:"+norm(a.nombre).replace(/[^a-z0-9]+
 
 /* reglas iniciales: se pueden cambiar en la pestaña Contrapartes */
 const REGLAS = [
-  [/EDETSA|EDET/i, "EDET (luz)", "Servicios"],
-  [/NATURGY/i, "Naturgy (gas)", "Servicios"],
-  [/TELECOM/i, "Telecom (teléfono/internet)", "Servicios"],
+  [/EDETSA|EDET/i, "EDET (luz)", "Luz"],
+  [/NATURGY/i, "Naturgy (gas)", "Gas"],
+  [/TELECOM/i, "Telecom (teléfono/internet)", "Teléfono / Internet"],
+  [/SAT\b|AGUAS?\b/i, "Agua", "Agua"],
   [/SURA/i, "Seguros Sura", "Seguros"],
   [/^ANSES$/i, "ANSES", "Ingresos ANSES"],
   [/Intereses del banco/i, "Intereses del banco", "Intereses"],
@@ -292,7 +294,13 @@ function cpCat(key){
   if(c && c.tipos.has("Débito automático")) return "Servicios";
   return "Sin clasificar";
 }
-function allCats(){ const s=new Set(CATS_DEF); Object.values(S.config.cat).forEach(c=>s.add(c)); return [...s]; }
+function allCats(){
+  const s=new Set((S.categorias&&S.categorias.length)?S.categorias:CATS_DEF);
+  Object.values(S.config.cat).forEach(c=>c&&s.add(c)); S.rows.forEach(r=>r.cat&&s.add(r.cat));
+  s.delete("Sin clasificar"); return [...s, "Sin clasificar"];
+}
+/* categoría de un movimiento: la suya propia si la tiene; si no, la de su persona o comercio */
+const rowCat = r => r.cat || cpCat(r.cp);
 
 /* ---------- importar y quitar duplicados ---------- */
 async function importar(files){
@@ -410,7 +418,7 @@ function vResumen(){
   const imp = S.imports.slice().sort((a,b)=>a.hasta<b.hasta?1:a.hasta>b.hasta?-1:(a.id<b.id?1:-1))[0];
   const saldo = imp ? imp.saldoFinal : S.rows[0].saldo;
   // por categoría (salidas)
-  const porCat={}; for(const r of R) if(r.deb) porCat[cpCat(r.cp)]=(porCat[cpCat(r.cp)]||0)+r.deb;
+  const porCat={}; for(const r of R) if(r.deb) porCat[rowCat(r)]=(porCat[rowCat(r)]||0)+r.deb;
   const cats = Object.entries(porCat).sort((a,b)=>b[1]-a[1]);
   const maxC = cats.length?cats[0][1]:1;
   // entradas por origen
@@ -477,7 +485,7 @@ function filtrarMovs(){
   else if(t==="auto") R=R.filter(r=>r.a.tipo==="Débito automático");
   else if(t==="anses") R=R.filter(r=>r.a.tipo==="ANSES");
   if(UI.cpF) R=R.filter(r=>r.cp===UI.cpF);
-  const q=norm(UI.q); if(q) R=R.filter(r=>norm(r.d+" "+cpName(r.cp)+" "+cpCat(r.cp)+" "+fFecha(r.f)).includes(q));
+  const q=norm(UI.q); if(q) R=R.filter(r=>norm(r.d+" "+cpName(r.cp)+" "+rowCat(r)+" "+fFecha(r.f)).includes(q));
   return R;
 }
 function vMovs(){
@@ -489,13 +497,13 @@ function vMovs(){
      <select id="tipoF">${[["todos","Todos"],["ent","Solo entradas"],["sal","Solo salidas"],["transf","Transferencias"],["comp","Compras con tarjeta"],["auto","Débitos automáticos"],["anses","ANSES"]].map(([k,l])=>`<option value="${k}" ${UI.tipoF===k?"selected":""}>${l}</option>`).join("")}</select>
      ${UI.cpF?`<span class="chip on" id="cpX">${esc(cpName(UI.cpF))} ✕</span>`:""}
    </div>
-   <p class="sub">${R.length} movimientos · entró ${money0(ent)} · salió ${money0(sal)} · ${periodoTxt()}</p>
+   <p class="sub">${esAdmin()?"Tocá un movimiento para ponerle categoría. ":""}${R.length} movimientos · entró ${money0(ent)} · salió ${money0(sal)} · ${periodoTxt()}</p>
    <div class="tw"><table>
     <tr><th>Fecha</th><th>Quién / qué</th><th>Categoría</th><th class="num">Salida</th><th class="num">Entrada</th><th class="num">Saldo</th></tr>
-    ${R.map(r=>`<tr><td class="num" style="text-align:left">${fFecha(r.f)}</td>
+    ${R.map(r=>`<tr ${esAdmin()?`class="click" data-mov="${esc(r.id)}" title="Tocá para cambiar la categoría"`:""}><td class="num" style="text-align:left">${fFecha(r.f)}</td>
       <td><span class="click-cp" data-cp="${esc(r.cp)}" style="cursor:pointer;font-weight:550">${esc(cpName(r.cp))}</span>${dupIds.has(r.id)?' <span class="tag auto" title="Mismo día, importe y contraparte que otra línea">¿duplicado?</span>':""}
         <div class="small"><span class="tag">${esc(r.a.tipo)}${r.a.sub?" · "+esc(r.a.sub):""}</span>${r.a.nota?"«"+esc(r.a.nota)+"» ":""}${esc(r.d)}</div></td>
-      <td><span class="tag">${esc(cpCat(r.cp))}</span></td>
+      <td><span class="tag ${r.cat?"auto":""}" title="${r.cat?"Categoría propia de este movimiento":"Categoría de "+esc(cpName(r.cp))}">${esc(rowCat(r))}</span>${esAdmin()?' <span class="small">✎</span>':""}</td>
       <td class="num deb">${r.deb?money(r.deb):""}</td><td class="num cr">${r.cred?money(r.cred):""}</td><td class="num small">${money(r.saldo)}</td></tr>`).join("")}
    </table></div></div>`;
 }
@@ -593,7 +601,8 @@ const after = {
     const q=$("#q"); let tm; q.oninput=()=>{ clearTimeout(tm); tm=setTimeout(()=>{ UI.q=q.value; const pos=q.selectionStart; render(); const n=$("#q"); n.focus(); n.setSelectionRange(pos,pos); },250); };
     $("#tipoF").onchange=e=>{UI.tipoF=e.target.value; render();};
     if($("#cpX")) $("#cpX").onclick=()=>{UI.cpF=""; render();};
-    document.querySelectorAll(".click-cp").forEach(s=>s.onclick=()=>irACp(s.dataset.cp));
+    document.querySelectorAll(".click-cp").forEach(s=>s.onclick=e=>{ e.stopPropagation(); irACp(s.dataset.cp); });
+    document.querySelectorAll("tr[data-mov]").forEach(t=>t.onclick=()=>{ const r=S.rows.find(x=>x.id===t.dataset.mov); if(r) dialogoCategoria(r); });
   },
   recur(){ document.querySelectorAll("tr[data-cp]").forEach(t=>t.onclick=()=>{ UI.periodo="todo"; irACp(t.dataset.cp); }); },
   transf(){
@@ -610,7 +619,7 @@ const after = {
     document.querySelectorAll("[data-alias]").forEach(i=>i.onchange=()=>{ const k=i.dataset.alias, v=i.value.trim(); if(v) S.config.alias[k]=v; else delete S.config.alias[k]; guardarCp(k); render(); });
     document.querySelectorAll("[data-cat]").forEach(s=>s.onchange=()=>{
       const k=s.dataset.cat;
-      if(s.value==="__new"){ pedirTexto("Nueva categoría","Nombre de la categoría (ej. Médicos, Farmacia, Alquiler peluquería):", v=>{ S.config.cat[k]=v; guardarCp(k); render(); }, ()=>render()); return; }
+      if(s.value==="__new"){ pedirTexto("Nueva categoría","Nombre de la categoría (ej. Médicos, Farmacia, Alquiler peluquería):", v=>{ agregarCategoria(v); S.config.cat[k]=v; guardarCp(k); render(); }, ()=>render()); return; }
       S.config.cat[k]=s.value; guardarCp(k); render();
     });
   }
@@ -622,6 +631,42 @@ function guardarCp(k){ persist(()=>apiPost("contraparte",{clave:k, nombre:S.conf
 function confirmar(titulo, texto, boton, ok){
   const r=$("#modalRoot"); r.innerHTML=`<div class="modal-bg"><div class="modal"><h3>${esc(titulo)}</h3><p class="small">${esc(texto)}</p><div class="acts"><button class="btn" id="mNo">Cancelar</button><button class="btn pri" id="mSi">${esc(boton)}</button></div></div></div>`;
   $("#mNo").onclick=()=>r.innerHTML=""; $("#mSi").onclick=()=>{ r.innerHTML=""; ok(); };
+}
+function agregarCategoria(v){
+  if(allCats().some(c=>norm(c)===norm(v))) return;
+  S.categorias = [...((S.categorias&&S.categorias.length)?S.categorias:CATS_DEF.filter(c=>c!=="Sin clasificar")), v];
+  persist(()=>apiPost("nuevaCategoria",{nombre:v}));
+}
+function dialogoCategoria(r){
+  const root=$("#modalRoot"), nombre=cpName(r.cp), actual=rowCat(r), cats=allCats();
+  const cuantos=S.rows.filter(x=>x.cp===r.cp).length;
+  root.innerHTML=`<div class="modal-bg"><div class="modal">
+    <h3>Categoría del movimiento</h3>
+    <p class="small" style="margin:0 0 12px">${fFecha(r.f)} · <b>${esc(nombre)}</b> · ${r.deb?"salida "+money(r.deb):"entrada "+money(r.cred)}</p>
+    <label class="small" for="mCat">Categoría</label>
+    <select id="mCat" style="width:100%;margin:4px 0 8px">${cats.map(c=>`<option ${c===actual?"selected":""}>${esc(c)}</option>`).join("")}<option value="__new">＋ Añadir categoría nueva…</option></select>
+    <input type="text" id="mNueva" placeholder="Nombre de la nueva categoría (ej. Farmacia)" style="width:100%;display:none;margin-bottom:8px">
+    <label style="display:flex;gap:8px;align-items:flex-start;font-size:14px;margin-top:6px"><input type="checkbox" id="mTodos" ${r.cat?"":"checked"} style="margin-top:3px">
+      <span>Aplicar a todos los movimientos de <b>${esc(nombre)}</b> (${cuantos}) y a los que se carguen más adelante</span></label>
+    <div class="acts"><button class="btn" id="mNo">Cancelar</button><button class="btn pri" id="mSi">Guardar</button></div>
+  </div></div>`;
+  const sel=$("#mCat"), inp=$("#mNueva");
+  sel.onchange=()=>{ inp.style.display = sel.value==="__new" ? "block":"none"; if(sel.value==="__new") inp.focus(); };
+  $("#mNo").onclick=()=>root.innerHTML="";
+  $("#mSi").onclick=()=>{
+    let cat = sel.value;
+    if(cat==="__new"){ cat=inp.value.trim(); if(!cat){ inp.focus(); return; } agregarCategoria(cat); }
+    const todos=$("#mTodos").checked; root.innerHTML="";
+    if(todos){
+      S.config.cat[r.cp]=cat; guardarCp(r.cp);
+      // los movimientos de esa persona/comercio con categoría propia pasan a usar la general
+      S.rows.filter(x=>x.cp===r.cp && x.cat).forEach(x=>{ x.cat=""; persist(()=>apiPost("catMov",{id:x.id,cat:""})); });
+    } else {
+      r.cat = (cat===cpCat(r.cp)) ? "" : cat;
+      persist(()=>apiPost("catMov",{id:r.id,cat:r.cat}));
+    }
+    render();
+  };
 }
 function pedirTexto(titulo, texto, ok, cancel){
   const r=$("#modalRoot"); r.innerHTML=`<div class="modal-bg"><div class="modal"><h3>${esc(titulo)}</h3><p class="small">${esc(texto)}</p><input type="text" id="mTx" style="width:100%"><div class="acts"><button class="btn" id="mNo">Cancelar</button><button class="btn pri" id="mSi">Guardar</button></div></div></div>`;

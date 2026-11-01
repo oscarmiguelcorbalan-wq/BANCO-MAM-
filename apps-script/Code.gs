@@ -13,12 +13,13 @@
 const CLAVE_ADMIN   = 'CAMBIAR-CLAVE-ADMIN';
 const CLAVE_LECTURA = 'CAMBIAR-CLAVE-FAMILIA';
 
-const H_MOV = 'Movimientos', H_CP = 'Contrapartes', H_IMP = 'Importaciones', H_AJ = 'Ajustes';
+const H_MOV = 'Movimientos', H_CP = 'Contrapartes', H_IMP = 'Importaciones', H_AJ = 'Ajustes', H_CAT = 'Categorías';
 /* ID de la hoja "BANCO-MAM - Movimientos de Mary": el script la abre directamente,
    así funciona aunque esté pegado en otro sitio. */
 const HOJA_ID = '1NzpHFXNRZ_xkUmQf__ZisePI2HRqSe4kFN4AlW22Bms';
 const CABECERAS = {
-  Movimientos:   ['ID', 'Fecha', 'Descripción', 'Débito', 'Crédito', 'Saldo', 'Importación', 'Orden'],
+  Movimientos:   ['ID', 'Fecha', 'Descripción', 'Débito', 'Crédito', 'Saldo', 'Importación', 'Orden', 'Categoría'],
+  'Categorías':  ['Categoría'],
   Contrapartes:  ['Clave', 'Nombre', 'Categoría'],
   Importaciones: ['ID', 'Archivo', 'Cuenta', 'Saldos al', 'Desde', 'Hasta', 'Filas', 'Nuevas', 'Duplicadas', 'Saldo final'],
   Ajustes:       ['Clave', 'Valor']
@@ -46,6 +47,8 @@ function doPost(e) {
       case 'contraparte': res = guardarContraparte(body.clave, body.nombre, body.cat); break;
       case 'okDup':       res = marcarOkDup(body.gk, !!body.valor); break;
       case 'borrar':      res = borrarMovimiento(body.id); break;
+      case 'catMov':      res = categoriaMovimiento(body.id, body.cat); break;
+      case 'nuevaCategoria': res = nuevaCategoria(body.nombre); break;
       case 'borrarTodo':  res = borrarTodo(); break;
       default: return json({ ok: false, error: 'accion' });
     }
@@ -104,7 +107,7 @@ function guardarAjuste(k, v) {
 /* ---------- lectura ---------- */
 function leerTodo() {
   const rows = filas(H_MOV).filter(function (r) { return r[0]; }).map(function (r) {
-    return { id: txt(r[0]), f: txt(r[1]), d: txt(r[2]), deb: num(r[3]), cred: num(r[4]), saldo: num(r[5]), imp: txt(r[6]), ord: Number(r[7]) || 0 };
+    return { id: txt(r[0]), f: txt(r[1]), d: txt(r[2]), deb: num(r[3]), cred: num(r[4]), saldo: num(r[5]), imp: txt(r[6]), ord: Number(r[7]) || 0, cat: r.length > 8 ? txt(r[8]) : '' };
   });
   const contrapartes = {};
   filas(H_CP).forEach(function (r) { if (r[0]) contrapartes[txt(r[0])] = { nombre: txt(r[1]), cat: txt(r[2]) }; });
@@ -115,7 +118,8 @@ function leerTodo() {
   const aj = ajustes();
   let okDup = {};
   try { okDup = JSON.parse(aj.okDup || '{}'); } catch (e) {}
-  return { rows: rows, contrapartes: contrapartes, imports: imports, cuenta: aj.cuenta || '', okDup: okDup };
+  const categorias = filas(H_CAT).map(function (r) { return txt(r[0]).trim(); }).filter(String);
+  return { rows: rows, contrapartes: contrapartes, imports: imports, cuenta: aj.cuenta || '', okDup: okDup, categorias: categorias };
 }
 
 /* ---------- escritura (solo admin) ---------- */
@@ -148,11 +152,11 @@ function importar(b) {
     const k = claveLinea(r);
     vistos[k] = (vistos[k] || 0) + 1;
     if (vistos[k] <= (existe[k] || 0)) { dup++; return; }
-    out.push([k + '#' + vistos[k], r.f, String(r.d), num(r.deb), num(r.cred), num(r.saldo), impId, i]);
+    out.push([k + '#' + vistos[k], r.f, String(r.d), num(r.deb), num(r.cred), num(r.saldo), impId, i, '']);
   });
   if (out.length) {
     const h = hoja(H_MOV);
-    h.getRange(h.getLastRow() + 1, 1, out.length, 8).setValues(out);
+    h.getRange(h.getLastRow() + 1, 1, out.length, 9).setValues(out);
   }
   const fechas = nuevasFilas.map(function (r) { return r.f; }).sort();
   const desde = fechas[0], hasta = fechas[fechas.length - 1];
@@ -176,6 +180,20 @@ function marcarOkDup(gk, valor) {
   try { o = JSON.parse(ajustes().okDup || '{}'); } catch (e) {}
   if (valor) o[gk] = true; else delete o[gk];
   guardarAjuste('okDup', JSON.stringify(o));
+  return {};
+}
+
+function categoriaMovimiento(id, cat) {
+  const h = hoja(H_MOV), rows = filas(H_MOV);
+  for (let i = 0; i < rows.length; i++) if (txt(rows[i][0]) === id) { h.getRange(i + 2, 9).setValue(cat || ''); return { ok: true }; }
+  throw new Error('no encontré ese movimiento');
+}
+
+function nuevaCategoria(nombre) {
+  nombre = String(nombre || '').trim();
+  if (!nombre) throw new Error('falta el nombre');
+  const ya = filas(H_CAT).some(function (r) { return txt(r[0]).trim().toLowerCase() === nombre.toLowerCase(); });
+  if (!ya) hoja(H_CAT).appendRow([nombre]);
   return {};
 }
 
