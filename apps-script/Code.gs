@@ -14,6 +14,15 @@ const CLAVE_ADMIN   = 'CAMBIAR-CLAVE-ADMIN';
 const CLAVE_LECTURA = 'CAMBIAR-CLAVE-FAMILIA';
 
 const H_MOV = 'Movimientos', H_CP = 'Contrapartes', H_IMP = 'Importaciones', H_AJ = 'Ajustes';
+/* ID de la hoja "BANCO-MAM - Movimientos de Mary": el script la abre directamente,
+   así funciona aunque esté pegado en otro sitio. */
+const HOJA_ID = '1NzpHFXNRZ_xkUmQf__ZisePI2HRqSe4kFN4AlW22Bms';
+const CABECERAS = {
+  Movimientos:   ['ID', 'Fecha', 'Descripción', 'Débito', 'Crédito', 'Saldo', 'Importación', 'Orden'],
+  Contrapartes:  ['Clave', 'Nombre', 'Categoría'],
+  Importaciones: ['ID', 'Archivo', 'Cuenta', 'Saldos al', 'Desde', 'Hasta', 'Filas', 'Nuevas', 'Duplicadas', 'Saldo final'],
+  Ajustes:       ['Clave', 'Valor']
+};
 
 function doGet(e) {
   const rol = rolDe((e && e.parameter && e.parameter.k) || '');
@@ -55,7 +64,18 @@ function rolDe(k) {
   return null;
 }
 function json(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
-function hoja(n) { return SpreadsheetApp.getActive().getSheetByName(n); }
+let _ss = null;
+function libro() { return _ss || (_ss = SpreadsheetApp.openById(HOJA_ID)); }
+function hoja(n) {
+  let h = libro().getSheetByName(n);
+  if (!h) {                       // si falta una pestaña, la crea con sus títulos
+    h = libro().insertSheet(n);
+    h.getRange(1, 1, 1, CABECERAS[n].length).setValues([CABECERAS[n]]);
+    h.getRange('A:C').setNumberFormat('@');
+    h.setFrozenRows(1);
+  }
+  return h;
+}
 function filas(n) {
   const h = hoja(n), last = h.getLastRow();
   if (last < 2) return [];
@@ -174,5 +194,5 @@ function borrarTodo() {
 /** Ejecutalo una vez desde el editor para dar permisos y comprobar que lee la hoja. */
 function probar() {
   const d = leerTodo();
-  Logger.log('Movimientos: ' + d.rows.length + ' · Contrapartes: ' + Object.keys(d.contrapartes).length);
+  Logger.log('Hoja: ' + libro().getName() + ' · Movimientos: ' + d.rows.length + ' · Contrapartes: ' + Object.keys(d.contrapartes).length);
 }
